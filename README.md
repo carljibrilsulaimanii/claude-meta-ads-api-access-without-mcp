@@ -13,7 +13,8 @@
 # Claude + Meta Ads: API access without the MCP connector
 
 Give Claude read access to a Meta ad account that the Meta Ads MCP connector won't
-serve. You create a small Meta app under your own profile, generate a user token with the
+serve. For many ad accounts, MCP access isn't enabled yet, so the connector can't read
+them at all. You create a small Meta app under your own profile, generate a user token with the
 Graph API Explorer, extend it to 60 days, and save it to a file on your computer. Claude
 (or any script) reads the file at query time and calls the Graph API directly. The token
 never enters a chat.
@@ -26,7 +27,9 @@ business portfolio admin rights, App Review or a system user.
 ## Why it exists
 
 The Meta Ads MCP connector is the intended way to let Claude read an ad account. It is
-being enabled **account by account**, and an account that isn't included yet returns:
+being enabled **account by account**, and **many ad accounts don't have MCP access
+yet.** The connector can list them, but every read on one returns *"This ad account is
+not enabled for the Ads MCP."*, and its account details show:
 
 ```json
 {
@@ -36,7 +39,10 @@ being enabled **account by account**, and an account that isn't included yet ret
 ```
 
 No permission, role or app setting changes that flag, and a Meta rep can't add an
-account to the rollout. The connector offers no fallback.
+account to the rollout. The connector offers no fallback. Being queryable doesn't help:
+an account can show `is_queryable: true` and still be shut out of the MCP. If you manage
+several accounts, expect some to be enabled and others not, so check each one
+(Step 1).
 
 The obvious fallback is a **system user token**, which never expires and is what Meta's
 docs point to. It is blocked for anyone who doesn't administer the business portfolio:
