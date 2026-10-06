@@ -4,7 +4,8 @@
   Date:    2026-10-06
   What:    Click-by-click guide for giving Claude read access to a Meta ad account (spend,
            creative, targeting, conversions, pixel diagnostics) through the Graph API with a
-           long-lived user token stored in a file, plus two scripts that use it.
+           long-lived user token stored in a file, plus two scripts that use it and
+           fifteen read-only example analyses (examples/).
   Why:     The Meta Ads MCP connector is enabled account by account, a blocked account has
            no route forward, and the system user token the docs point to is gated behind
            business portfolio admin rights most operators don't have.
@@ -108,6 +109,7 @@ Every call is a read (`GET`). Nothing in this guide changes a campaign.
 |---|---|---|
 | [`README.md`](README.md) | This guide | — |
 | [`scripts/`](scripts/) | Two Python scripts that read the token file and call the Graph API: an ad set dump (Step 8) and a pixel source trace (Step 9) | Your computer, Python 3.8+, no packages to install |
+| [`examples/`](examples/) | Fifteen more read-only analysis scripts using the same token file: spend, CPL, campaign structure, ad destinations, custom conversions, pixel timing ([section 3](#3-more-example-analyses)) | Your computer, Python 3.8+, no packages to install |
 
 ## Table of contents
 
@@ -123,6 +125,10 @@ Every call is a read (`GET`). Nothing in this guide changes a campaign.
   - [Step 8: Verify, then dump your ad sets](#step-8-verify-then-dump-your-ad-sets)
   - [Step 9: Pixel diagnostics](#step-9-pixel-diagnostics)
   - [Step 10: Let Claude use it](#step-10-let-claude-use-it)
+- [3. More example analyses](#3-more-example-analyses)
+  - [How to run any example](#how-to-run-any-example)
+  - [The examples](#the-examples)
+  - [Traps these scripts already handle](#traps-these-scripts-already-handle)
 - [Limits](#limits)
 - [Troubleshooting](#troubleshooting)
 - [Maintenance](#maintenance)
@@ -513,7 +519,154 @@ Invoke-RestMethod "https://graph.facebook.com/v26.0/<path>?<params>&access_token
 - *"Show Purchase volume by host for the last two weeks."* ← the funnel-swap detector
 - *"Split Purchase into browser versus server."* ← finds which sender changed
 
+**10e.** For questions you'll ask again and again, there are ready-made scripts in
+[`examples/`](examples/). See [3. More example analyses](#3-more-example-analyses).
+
 ✅ **Check:** Claude answers one of those without asking you for the token.
+
+## 3. More example analyses
+
+Fifteen more scripts from the same build, each answering one question that came up
+while running a real ad account. They read the same token file as Steps 8 and 9, make
+only `GET` calls (nothing changes in your account), print a plain table, and need
+nothing beyond Python 3.8+.
+
+> ⚠️ **Adapted, not re-run.** Each example comes from a script that ran against a real ad
+> account. To publish them, account ids became placeholders, hardcoded dates became
+> arguments, the Graph API version was raised to match Steps 8 and 9, and two known bugs
+> were fixed (a display URL read as a destination, and a custom-conversions call to an
+> edge that doesn't exist). The adapted versions haven't been run since. If one fails,
+> open an issue.
+
+### How to run any example
+
+About 2 minutes per script.
+
+**3a. Fill in the ids.** Open the script and set the constants at the top. Every
+script has `ACT` (your ad account, keeping the `act_` prefix, as in Step 8b). A few
+need more; the **Inputs to fill** column below lists them.
+
+```python
+ACT = "act_1234567890"
+```
+
+A script with a placeholder left stops with a message such as `set ACT at the top of
+this file to your ad account id` and makes no API call.
+
+**3b. Run it from the repo folder**, with the arguments in the table (dates as
+`YYYY-MM-DD`). For example:
+
+```powershell
+python examples/meta-daily-spend.py 2026-03-01 2026-03-15
+```
+
+Runs [`examples/meta-daily-spend.py`](examples/meta-daily-spend.py).
+
+Running a script with no arguments, where it needs some, prints its `usage:` line.
+
+**3c. What success looks like.** The first line is
+`token loaded (200 chars) — not printed, not stored` (the length varies), then the
+table. A Graph API error stops the script and prints Meta's error JSON instead
+(`{"error":{"message":...`); see [Troubleshooting](#troubleshooting).
+
+**3d. In Claude Code**, add an allow rule for each script you'll use, in the same form
+as Step 10b, for example:
+
+```json
+"Bash(python examples/meta-daily-spend.py:*)"
+```
+
+✅ **Check:** one script prints its table, not an `{"error":...}` message.
+
+### The examples
+
+Run each from the repo folder as `python examples/<script> <arguments>`.
+
+| Script | Question it answers | Inputs to fill | Output |
+|---|---|---|---|
+| [`examples/meta-daily-spend.py`](examples/meta-daily-spend.py) | What did each day cost, and what's the total for closed days only? | `ACT`; args `[SINCE] [UNTIL]` (default: this month to date) | Daily spend, impressions, CPM, leads, CPL; closed-day total kept apart from today's running figure |
+| [`examples/meta-action-type-audit.py`](examples/meta-action-type-audit.py) | Which `action_type` names does my account report, and which ones are the same event counted twice? | `ACT`; args `SINCE UNTIL` | Every action type with its count, largest first |
+| [`examples/meta-period-compare.py`](examples/meta-period-compare.py) | How does this window compare with last year's (or last week's)? | `ACT`; args `SINCE:UNTIL` once per window | One aggregate block per window: spend, impressions, reach, CPM, leads, impression-to-lead rate, CPL |
+| [`examples/meta-cpl-decompose.py`](examples/meta-cpl-decompose.py) | CPL went up: was it the auction (CPM) or the ads and funnel (leads per impression)? | `ACT`; args `SINCE UNTIL [MONTH_A MONTH_B]` | Monthly table, then one line: CPM ×, lead-per-impression ×, CPL × between the two months |
+| [`examples/meta-lead-source-split.py`](examples/meta-lead-source-split.py) | Were the cheap months cheap because of Instant Forms? | `ACT`; args `SINCE UNTIL` | Monthly leads split into website pixel and Instant Form, with % Instant Form and CPL |
+| [`examples/meta-campaign-sum-vs-account.py`](examples/meta-campaign-sum-vs-account.py) | What did each campaign spend in this window, and do the campaigns add up to the account? | `ACT`; args `SINCE UNTIL` | Per-campaign spend, CPM, leads, CPL, purchases; account total; `reconciles : YES` or the difference |
+| [`examples/meta-campaign-day-by-day.py`](examples/meta-campaign-day-by-day.py) | Did yesterday's restructure work, campaign by campaign? | `ACT`; args `DAY [DAY ...]` | Account row per day, then each campaign's figures per day |
+| [`examples/meta-campaign-mix-by-week.py`](examples/meta-campaign-mix-by-week.py) | How was last season wired: which campaigns carried the money each week, and where did their ads send people? | `ACT` (optional `MIN_SPEND`); args `SINCE UNTIL` | Week-by-campaign grid of spend and purchases; each campaign's ad names grouped by landing page |
+| [`examples/meta-live-structure.py`](examples/meta-live-structure.py) | What's live right now: budgets, CBO or ABO, and which event each ad set optimizes to? | `ACT` | Active campaigns with objective, budget, bid strategy; each active ad set's budget and event (single, sequence or custom conversion); sequenced vs single count |
+| [`examples/meta-adset-optimization-settings.py`](examples/meta-adset-optimization-settings.py) | How exactly are the ad sets in one campaign optimized, and on what attribution window? | `ACT`; args `KEYWORD [LIMIT] [--all]` (keyword matches campaign names) | Per ad set: optimization goal, destination, `promoted_object`, sub-event, `attribution_spec` |
+| [`examples/meta-list-custom-conversions.py`](examples/meta-list-custom-conversions.py) | Does that custom conversion exist, what's its rule, is it archived, and is it firing? | `ACT` | Every custom conversion: id, name, event type, rule, created, last fired, default value, archived flag |
+| [`examples/meta-purchase-split-by-custom-conversion.py`](examples/meta-purchase-split-by-custom-conversion.py) | What is purchase spend actually buying: the main product or the cheap add-on? | `ACT`, `CC_A`, `CC_B` (custom conversion ids from the script above) and their labels; args `DAY [DAY ...]` | Per campaign per day: spend, generic purchases, and each custom conversion's count |
+| [`examples/meta-ads-running-today.py`](examples/meta-ads-running-today.py) | Which live ads point at this page, and are they spending today? | `ACT`; arg `[URL_KEYWORD]` (none = every active ad) | Per ad: campaign, ad set, **click** URL and **display** URL separately, spend and impressions today and yesterday |
+| [`examples/meta-ad-creative-dump.py`](examples/meta-ad-creative-dump.py) | In a multi-link (asset feed) ad, which video or text carries which link? | Nothing to fill; arg `<adset_id or ad_id>` | Ad list on screen; full creative specs in `ad-creative-dump.json` (git-ignored) |
+| [`examples/meta-pixel-event-hourly.py`](examples/meta-pixel-event-hourly.py) | At what hour did this event stop (or start) arriving? | `PIXEL` (as in Step 9d); args `[EVENT] [DAYS]` | Hourly arrival counts for one event, with a total |
+
+The pixel script needs `ads_management` and `business_management` on the token, like
+Step 9. All the others need only `ads_read`.
+
+### Traps these scripts already handle
+
+Each one cost a wrong number in production before it was handled. Keep them in mind
+when you ask Claude for something the scripts don't cover.
+
+> ⚠️ **One event, several `action_type` names. Pick one, never add them.** `lead`,
+> `offsite_conversion.fb_pixel_lead`, `onsite_web_lead` and
+> `onsite_conversion.lead_grouped` can carry the same count. A daily spend script that
+> summed three of them doubled the lead count and halved the CPL, and a plan was
+> written on that number. The scripts use `lead` and `purchase` only. Run
+> [`examples/meta-action-type-audit.py`](examples/meta-action-type-audit.py) once on
+> your account to see which names match.
+
+> ⚠️ **Except when Instant Forms run.** `lead` includes on-Meta Instant Form leads;
+> `offsite_conversion.fb_pixel_lead` counts only website leads. In those months the two
+> differ, and the gap is the Instant Form share
+> ([`examples/meta-lead-source-split.py`](examples/meta-lead-source-split.py)). Instant
+> Form months produce much cheaper leads that show up and buy far less, so don't set a
+> CPL target from them.
+
+> ⚠️ **A day that's still running isn't a number yet.** A month-to-date total taken
+> before a day closed carried a fraction of that day's real spend, and everything built
+> on it was off. Quote closed days; label today as running. Days are in the **ad
+> account's time zone**, while "today" in the scripts is your computer's date.
+
+> ⚠️ **Meta's conversion count isn't your CRM's.** Ads Manager credits a conversion
+> to an ad clicked in the last 7 days (and viewed in the last day) even if an email
+> finished the job; a CRM's last-click report doesn't. The ratio between them stays
+> steady from week to week; a sudden change in it is the signal. Pixel `/stats`
+> counts raw event arrivals, which is a third number again: compare its shape over
+> time, not its totals.
+
+> ⚠️ **The display URL is not the destination.** `link_caption`, `caption` and
+> `display_url` are text printed under the ad. The landing page is `link`,
+> `call_to_action.value.link` or `website_url`. An audit that mixed them reported
+> spend "going to" a page that two big-spend ads only mentioned in their caption.
+> [`examples/meta-ads-running-today.py`](examples/meta-ads-running-today.py) prints
+> `click:` and `display:` on separate lines, and
+> [`examples/meta-campaign-mix-by-week.py`](examples/meta-campaign-mix-by-week.py) uses
+> click URLs only.
+
+> ⚠️ **`optimization_goal` can't tell you what an ad set optimizes to.** It reads
+> `OFFSITE_CONVERSIONS` for a single event and for a `LEAD → PURCHASE` sequence alike.
+> Read `promoted_object`: `multi_event_product` marks a sequence. And a custom
+> conversion shows `custom_conversion_id` **alongside** `custom_event_type: PURCHASE`;
+> reading the event type first reports "still on generic Purchase" when it isn't. In
+> production, "the ad sets now optimize to the custom conversion" was reported done
+> more than once while `promoted_object` still showed the standard event.
+> [`examples/meta-live-structure.py`](examples/meta-live-structure.py) checks the id
+> first.
+
+> ⚠️ **Check custom conversions in the account, not in a plan.** An archived
+> conversion with a near-identical name is the one people find first.
+> Custom conversions count only from the day they were created, can't be created over
+> the API (Events Manager only), and can't be switched onto an ad set that's already
+> published, only set on a new one.
+
+> ⚠️ **`last_fired_time` lags.** A pixel's `last_fired_time` read hours stale while
+> events were arriving normally. Use
+> [`examples/meta-pixel-event-hourly.py`](examples/meta-pixel-event-hourly.py) to see
+> when an event really stopped.
+
+> ⚠️ **Account-wide `/ads` with the creative expanded can be too big for one
+> response.** The destination scripts walk the active ad sets one at a time instead.
 
 ## Limits
 
@@ -545,6 +698,9 @@ Invoke-RestMethod "https://graph.facebook.com/v26.0/<path>?<params>&access_token
 | `(#3018) ...beyond 37 months` | History ceiling | Nothing to fix (see Limits) |
 | `Error validating access token` | Expired (about 60 days) | Extend again (Step 6) and re-save (Step 7) |
 | `set ACT at the top of this file...` / `set PIXEL...` | Placeholder still in the script | Steps 8b and 9d |
+| `set CC_A and CC_B...` | Custom conversion ids not filled in | Get them from [`examples/meta-list-custom-conversions.py`](examples/meta-list-custom-conversions.py) ([section 3a](#how-to-run-any-example)) |
+| `usage: python examples/...` | The example needs arguments | Pass them as listed in [The examples](#the-examples) |
+| A custom conversion column reads 0 on every day | The days are before the conversion was created, or the id is wrong | Check `created` and `id` with [`examples/meta-list-custom-conversions.py`](examples/meta-list-custom-conversions.py) |
 | `token file not found` | File not at `~/.meta-ads/token` | Step 7 |
 | Daily totals wildly too small | Hourly `/stats` buckets assigned, not summed | Sum per day (Step 9) |
 
