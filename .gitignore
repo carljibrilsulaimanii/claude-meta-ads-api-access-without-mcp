@@ -1,0 +1,10 @@
+# Output of scripts/meta-adsets-dump.py: your campaigns, budgets and targeting
+adsets-live.json
+*.json
+# Never commit a token, even an expired one
+token
+*.token
+.meta-ads/
+__pycache__/
+*.pyc
+.env
