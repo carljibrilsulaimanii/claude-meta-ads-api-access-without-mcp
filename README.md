@@ -51,10 +51,15 @@ docs point to. It is blocked for anyone who doesn't administer the business port
    to generate a system user access token, an app must be part of this business
    portfolio. Please add an app."*
 2. You can't add an app to the portfolio without admin rights.
-3. So you create the app under your own profile and try to add a portfolio admin to it.
-   That fails with **Form can't be saved**: *"You are trying to add users that haven't
-   registered their developer accounts."* Meta won't add anyone to an app until they've
-   registered at https://developers.facebook.com/.
+3. So you create the app under your own profile and try to add a portfolio admin to it
+   (**App roles → Roles → Add People**, role **Administrator**). The dialog warns *"A
+   Facebook Developer Account is required to be added to an app."*, and saving fails
+   with **Form can't be saved**: *"You are trying to add users that haven't registered
+   their developer accounts."* Meta won't add anyone to an app until they've registered
+   at https://developers.facebook.com/.
+4. Adding the app from the portfolio side (**Business Settings → Accounts → Apps → Add**,
+   enter the **App ID**) needs an admin too, and when tried it returned *"There was an
+   unexpected technical issue. Please try again."*
 
 A **long-lived user token** has none of those gates. It needs only your own access to
 the ad account, and it lasts about 60 days.
@@ -182,8 +187,11 @@ has five tabs: **App details · Use cases · Business · Requirements · Overvie
 **3b. App details.** Enter an **App Name** (for example `Claude Ads Reader`) and an
 **App Email**. Click **Next**.
 
-**3c. Use cases.** Under **Add use cases**, filter **Featured**. Tick **only**
-**Create & manage ads with Marketing API**. Click **Next**.
+**3c. Use cases.** Under **Add use cases**, leave **Filter by** on **Featured (6)**. Tick
+**only** the first card, **Create & manage ads with Marketing API** (*"Create, manage
+and optimize ad campaigns across Meta technologies..."*). Don't confuse it with the
+second card, **Create & manage app ads with Meta Ads Manager**, which *"Does not include
+access to Marketing API."* Click **Next**.
 
 > ⚠️ **Tick one use case.** Every extra use case adds review requirements you don't need
 > for reading your own accounts.
@@ -194,13 +202,16 @@ the last option, **I don't want to connect a business portfolio yet.** This bloc
 nothing on the user-token route. Click **Next**.
 
 > ⚠️ **Scroll inside the list before deciding a portfolio is missing.** The list scrolls
-> on its own, and the top entry can sit above the fold.
+> on its own, and on a profile with many portfolios the top entries sit above the fold.
+> The **I don't want to connect a business portfolio yet.** option is always last.
 
 **3e. Requirements.** It should say *"No requirements for the use cases on this app."*
 Click **Next**.
 
-**3f. Overview.** Check **App Name**, **App Email**, and Business *"No business
-selected."* Click **Create app**. Meta may ask for your password (wording may differ).
+**3f. Overview.** Check **App Name**, **App Email**, the one use case, Business *"No
+business selected."* and Requirements *"No requirements for the use cases on this
+app."* Clicking **Create app** agrees to the Meta Platform Terms and Developer
+Policies. Meta may ask for your password (wording may differ).
 
 **3g.** On the app dashboard, copy the **App ID**. You'll pick the app by name in Step 5,
 but keep the id for reference.
@@ -211,11 +222,13 @@ but keep the id for reference.
 
 About 2 minutes.
 
-**4a.** In the app's left menu, open **Use cases**, then **Customize** on *Create &
-manage ads with Marketing API*. The page heading is **Customize use case**.
+**4a.** In the app's left menu, open **Use cases**, then customize *Create & manage ads
+with Marketing API*. The breadcrumb reads **Use cases > Customize**, the heading is
+**Customize use case**, and the dropdown at the top left shows **Create & manage ads**.
 
-**4b.** In the left nav, open **Permissions and features**. Find these three and confirm
-each shows **Ready for testing**:
+**4b.** In the left nav, open **Permissions and features**. In the **Status** column,
+confirm these three show **Ready for testing** (other rows show **Add** buttons; leave
+them alone):
 
 | Permission | Needed for |
 |---|---|
@@ -239,17 +252,23 @@ About 5 minutes.
 **5b.** In the right-hand panel:
 1. **Meta App** → your app from Step 3.
 2. **User or Page** → **User Token**.
-3. **Permissions** tab → **Add a Permission** → add `ads_read`, `ads_management` and
-   `business_management`. Add all three now: a token with only `ads_read` works for
+3. **Permissions** tab (next to **Configurations**) → **Add a Permission** → pick from the
+   dropdown. Add `ads_read`, `ads_management` and `business_management`. Add all three now: a token with only `ads_read` works for
    spend but returns `(#100) Permission Denied` on pixel diagnostics, and you'd have to
    generate and extend a second token.
-4. Leave the version dropdown on its default (**v26.0** when this was built).
+4. In the request bar at the top (**GET** · `graph.facebook.com/` · version · path),
+   leave the version dropdown on its default (**v26.0** when this was built).
 
 **5c.** Click **Generate Access Token**. Approve the Facebook dialog. If it lists
 businesses or ad accounts, make sure yours is ticked (wording may differ).
 
-**5d.** Click **Submit** on the default query `me?fields=id,name`. Your name and id come
-back.
+**5d.** Click **Submit** on the default query `me?fields=id,name`. Your `id` and `name`
+come back, with *"Response received in ... ms"* under the result.
+
+> ⚠️ **The token is visible in the Explorer's Access Token box.** Don't screenshot this
+> panel either. If you need to share a result, the **Copy Debug Information** button
+> under the response copies the query and the token's metadata, not just the JSON;
+> paste only the JSON part.
 
 **5e.** Confirm every permission was granted. Replace the query with:
 
@@ -274,9 +293,13 @@ me/adaccounts?fields=name,account_id,account_status
 **5g.** Copy your `account_id`. API calls use it with an `act_` prefix:
 `act_1234567890`.
 
-**5h.** Optional double check: on Facebook, open **Settings → Business Integrations**,
-click your app, and confirm **Access your Facebook ads and related stats** is switched
-on. **Cancel** out without changing anything.
+**5h.** Optional double check: on Facebook, open **Settings → Business Integrations**.
+Your app is on the **Active** tab. Click **View and edit** next to it and confirm,
+under *"WHAT BUSINESS FEATURES CAN BE MANAGED:"*, that **Access your Facebook ads and
+related stats** is switched on. Click **Cancel** without changing anything.
+
+> ⚠️ The same page notes that an app's access can expire after 90 days of inactivity.
+> A token you use regularly isn't affected.
 
 ✅ **Check:** your ad account appears in `me/adaccounts`, and `me/permissions` shows all
 three permissions `granted`.
@@ -539,10 +562,11 @@ Invoke-RestMethod "https://graph.facebook.com/v26.0/<path>?<params>&access_token
 - The token reads everything your profile can see in that account. Treat it like a
   password.
 - **Never paste it into a chat, a screenshot, a ticket or a commit.** In the original
-  build it leaked into a debugger screenshot, a pasted terminal command and the browser
-  history. Each of those is a working copy until the token expires.
-- If a token leaks, revoke it: on Facebook, **Settings → Business Integrations**, remove
-  the app (wording may differ), then repeat Steps 5 to 7.
+  build it leaked into a debugger screenshot, Explorer screenshots, a pasted terminal
+  command and the browser history. Each of those is a working copy until the token expires.
+- If a token leaks, revoke it: on Facebook, **Settings → Business Integrations**, click
+  **Remove** next to the app on the **Active** tab, then repeat Steps 5 to 7. Generating
+  a new token does **not** cancel the old one.
 - The scripts read the file into memory, print only its length, and never write it
   anywhere. `.gitignore` excludes `token` files and the JSON output.
 - Pin the API version you tested (`v26.0` here). Meta retires old versions on a
